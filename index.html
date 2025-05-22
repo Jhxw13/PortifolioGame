@@ -51,7 +51,8 @@
     let rocketFlying = false;
     let rocketFlyStart = 0;
     let playerImg, casaImg, arvoreImg, empresaImg, lojaImg, xandinhoImg, carImg, barbeariaImg, lulinhaImg, jairbolzonaroImg, coinImg, rocketImg, groundTexture, bemvindoImg, nuvemImg;
-    let leftButton, rightButton, jumpButton, interactButton;
+    let joystick = { active: false, x: 0, y: 0, knobX: 0, knobY: 0, radius: 0, knobRadius: 0 };
+    let interactButton;
     let lastClickTime = 0;
     let lastInteractTime = 0;
     let lastInteractTimeScenery = 0;
@@ -199,10 +200,9 @@
 
       let buttonSize = min(displayWidth * 0.15, 120);
       let buttonOffset = displayHeight * 0.1;
-      leftButton = { x: displayWidth * 0.05, y: displayHeight - buttonSize - buttonOffset, w: buttonSize, h: buttonSize, active: false };
-      rightButton = { x: displayWidth * 0.2, y: displayHeight - buttonSize - buttonOffset, w: buttonSize, h: buttonSize, active: false };
-      jumpButton = { x: displayWidth * 0.95 - buttonSize, y: displayHeight - buttonSize - buttonOffset, w: buttonSize, h: buttonSize, active: false };
-      interactButton = { x: displayWidth * 0.95 - buttonSize, y: displayHeight - 2 * buttonSize - buttonOffset - 10, w: buttonSize, h: buttonSize, active: false };
+      interactButton = { x: displayWidth * 0.95 - buttonSize, y: displayHeight - buttonSize - buttonOffset, w: buttonSize, h: buttonSize, active: false };
+      joystick.radius = min(displayWidth * 0.1, 60);
+      joystick.knobRadius = joystick.radius / 2;
     }
 
     function draw() {
@@ -304,16 +304,17 @@
       text(`Moedas: ${player.score}`, 10, 10);
 
       if (isMobile()) {
-        for (let btn of [leftButton, rightButton, jumpButton, interactButton]) {
-          fill(btn.active ? [100, 100, 100, 200] : [150, 150, 150, 200]);
-          rect(btn.x, btn.y, btn.w, btn.h, 10 * (displayWidth / 800));
+        if (joystick.active) {
+          fill(150, 150, 150, 200);
+          ellipse(joystick.x, joystick.y, joystick.radius * 2);
+          fill(100, 100, 100, 200);
+          ellipse(joystick.knobX, joystick.knobY, joystick.knobRadius * 2);
         }
+        fill(interactButton.active ? [100, 100, 100, 200] : [150, 150, 150, 200]);
+        rect(interactButton.x, interactButton.y, interactButton.w, interactButton.h, 10 * (displayWidth / 800));
         fill(0);
         textSize(min(24 * (displayWidth / 800), displayWidth / 25));
         textAlign(CENTER, CENTER);
-        text("←", leftButton.x + leftButton.w / 2, leftButton.y + leftButton.h / 2);
-        text("→", rightButton.x + rightButton.w / 2, rightButton.y + rightButton.h / 2);
-        text("↑", jumpButton.x + jumpButton.w / 2, jumpButton.y + jumpButton.h / 2);
         text("A", interactButton.x + interactButton.w / 2, interactButton.y + interactButton.h / 2);
       }
     }
@@ -610,24 +611,13 @@
           }
         }
 
-        if (touchX > leftButton.x && touchX < leftButton.x + leftButton.w &&
-            touchY > leftButton.y && touchY < leftButton.y + leftButton.h) {
-          player.vx = -player.speed;
-          leftButton.active = true;
-          console.log("Botão Esquerda pressionado");
-        }
-        if (touchX > rightButton.x && touchX < rightButton.x + rightButton.w &&
-            touchY > rightButton.y && touchY < rightButton.y + rightButton.h) {
-          player.vx = player.speed;
-          rightButton.active = true;
-          console.log("Botão Direita pressionado");
-        }
-        if (touchX > jumpButton.x && touchX < jumpButton.x + jumpButton.w &&
-            touchY > jumpButton.y && touchY < jumpButton.y + jumpButton.h &&
-            player.grounded) {
-          player.vy = JUMP_FORCE;
-          jumpButton.active = true;
-          console.log("Botão Pulo pressionado");
+        if (touchX < displayWidth / 2 && touchY > displayHeight / 2) {
+          joystick.active = true;
+          joystick.x = touchX;
+          joystick.y = touchY;
+          joystick.knobX = touchX;
+          joystick.knobY = touchY;
+          console.log("Joystick ativado");
         }
         if (touchX > interactButton.x && touchX < interactButton.x + interactButton.w &&
             touchY > interactButton.y && touchY < interactButton.y + interactButton.h) {
@@ -639,13 +629,44 @@
       return false;
     }
 
+    function touchMoved() {
+      for (let touch of touches) {
+        let touchX = touch.x;
+        let touchY = touch.y;
+        if (joystick.active && touchX < displayWidth / 2 && touchY > displayHeight / 2) {
+          let dx = touchX - joystick.x;
+          let dy = touchY - joystick.y;
+          let distance = sqrt(dx * dx + dy * dy);
+          if (distance > joystick.radius) {
+            let angle = atan2(dy, dx);
+            joystick.knobX = joystick.x + cos(angle) * joystick.radius;
+            joystick.knobY = joystick.y + sin(angle) * joystick.radius;
+          } else {
+            joystick.knobX = touchX;
+            joystick.knobY = touchY;
+          }
+          let angle = atan2(dy, dx);
+          let minDistance = joystick.knobRadius / 2;
+          if (distance > minDistance) {
+            player.vx = cos(angle) * player.speed;
+            if (angle < -PI / 4 && angle > -3 * PI / 4 && player.grounded) {
+              player.vy = JUMP_FORCE;
+              console.log("Pulo acionado pelo joystick");
+            }
+          } else {
+            player.vx = 0;
+          }
+        }
+      }
+      return false;
+    }
+
     function touchEnded() {
+      joystick.active = false;
       player.vx = 0;
-      leftButton.active = false;
-      rightButton.active = false;
-      jumpButton.active = false;
       interactButton.active = false;
       console.log("Toque finalizado");
+      return false;
     }
 
     function keyPressed() {
@@ -775,22 +796,12 @@
       }
       let buttonSize = min(displayWidth * 0.15, 120);
       let buttonOffset = displayHeight * 0.1;
-      leftButton.x = displayWidth * 0.05;
-      leftButton.y = displayHeight - buttonSize - buttonOffset;
-      leftButton.w = buttonSize;
-      leftButton.h = buttonSize;
-      rightButton.x = displayWidth * 0.2;
-      rightButton.y = displayHeight - buttonSize - buttonOffset;
-      rightButton.w = buttonSize;
-      rightButton.h = buttonSize;
-      jumpButton.x = displayWidth * 0.95 - buttonSize;
-      jumpButton.y = displayHeight - buttonSize - buttonOffset;
-      jumpButton.w = buttonSize;
-      jumpButton.h = buttonSize;
       interactButton.x = displayWidth * 0.95 - buttonSize;
-      interactButton.y = displayHeight - 2 * buttonSize - buttonOffset - 10;
+      interactButton.y = displayHeight - buttonSize - buttonOffset;
       interactButton.w = buttonSize;
       interactButton.h = buttonSize;
+      joystick.radius = min(displayWidth * 0.1, 60);
+      joystick.knobRadius = joystick.radius / 2;
     }
 
     function resetGame() {
