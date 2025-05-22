@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Jogo Portfólio</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: #87CEEB;
+      touch-action: none;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      -khtml-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+  </style>
+</head>
+<body>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/p5.min.js"></script>
+  <script>
+    const GRAVITY = 0.6;
+    const JUMP_FORCE = -16;
+    const PLAYER_SPEED = 5;
+    let player;
+    let platforms = [];
+    let npcs = [];
+    let scenery = [];
+    let clouds = [];
+    let cars = [];
+    let coins = [];
+    let dialog = null;
+    let gameOver = false;
+    let gameStarted = true;
+    let chaseActive = false;
+    let rocketFlying = false;
+    let rocketFlyStart = 0;
+    let playerImg, casaImg, arvoreImg, empresaImg, lojaImg, xandinhoImg, carImg, barbeariaImg, lulinhaImg, jairbolzonaroImg, coinImg, rocketImg, groundTexture, bemvindoImg, nuvemImg;
+    let leftButton, rightButton, jumpButton, interactButton;
+    let lastClickTime = 0;
+    let lastInteractTime = 0;
+    let lastInteractTimeScenery = 0;
+    let lastSceneryInteracted = null;
+    let interactCooldown = 500;
+    let sceneryInteractInterval = 500;
+
+    function preload() {
+      try {
+        playerImg = loadImage("assets/elonmosca.png");
+        casaImg = loadImage("assets/casa_moderna.png");
+        arvoreImg = loadImage("assets/arvorepixelart.png");
+        empresaImg = loadImage("assets/predio.png");
+        lojaImg = loadImage("assets/loja.png");
+        xandinhoImg = loadImage("assets/xandinho.png");
+        carImg = loadImage("assets/carro.png");
+        barbeariaImg = loadImage("assets/barbearia.png");
+        lulinhaImg = loadImage("assets/lulinha.png");
+        jairbolzonaroImg = loadImage("assets/jairbolzonaro.png");
+        coinImg = loadImage("assets/coin.png");
+        rocketImg = loadImage("assets/foguete.png");
+        groundTexture = loadImage("assets/grass.png");
+        bemvindoImg = loadImage("assets/bemvindo.png");
+        nuvemImg = loadImage("assets/nuvem.png");
+      } catch (e) {
+        console.error("Erro ao carregar imagens: ", e);
+      }
+    }
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      let scale = windowWidth / 800;
+
+      platforms.push({
+        x: 0,
+        y: windowHeight - 100 * scale,
+        w: windowWidth * 3,
+        h: 100 * scale,
+        road: { h: 20 * scale }
+      });
+
+      player = {
+        x: 100 * scale,
+        y: platforms[0].y - 48 * scale,
+        w: 32 * scale,
+        h: 48 * scale,
+        vx: 0,
+        vy: 0,
+        speed: PLAYER_SPEED * scale,
+        grounded: false,
+        score: 0
+      };
+
+      scenery.push({ img: bemvindoImg, x: windowWidth / 2 - 150 * scale * 1.089, y: 30 * scale, w: 300 * scale * 1.089, h: 90 * scale * 1.089, type: 'welcome', baseY: 30 * scale, active: false });
+      scenery.push({ img: casaImg, x: 300 * scale, y: platforms[0].y - 100 * scale + 20 * scale, w: 150 * scale * 0.9, h: 100 * scale * 0.9, type: 'house', message: 'Casa Moderna - Projeto residencial com design inovador, feito com HTML, CSS e JS.', url: 'https://github.com/yourusername/house-project', active: false });
+      scenery.push({ img: empresaImg, x: 600 * scale, y: platforms[0].y - 110 * scale + 10 * scale, w: 200 * scale * 0.9, h: 120 * scale * 0.9, type: 'company', message: 'Empresa Tech - Sistema de gestão em React e Node.js.', url: 'https://github.com/yourusername/company-project', active: false });
+      scenery.push({ img: lojaImg, x: 1000 * scale, y: platforms[0].y - 95 * scale + 10 * scale, w: 180 * scale * 0.9, h: 110 * scale * 0.9, type: 'office', message: 'Loja Virtual - E-commerce com Node.js e MongoDB.', url: 'https://github.com/yourusername/office-project', active: false });
+      scenery.push({ img: arvoreImg, x: 1300 * scale, y: platforms[0].y - 110 * scale + 10 * scale, w: 80 * scale * 0.9, h: 120 * scale * 0.9, type: 'tree', message: 'Uma árvore cheia de vida!', active: false });
+      scenery.push({ img: arvoreImg, x: 450 * scale, y: platforms[0].y - 110 * scale + 10 * scale, w: 80 * scale * 0.9, h: 120 * scale * 0.9, type: 'tree', message: 'Outra árvore majestosa!', active: false });
+      scenery.push({ img: arvoreImg, x: 700 * scale, y: platforms[0].y - 110 * scale + 10 * scale, w: 80 * scale * 0.9, h: 120 * scale * 0.9, type: 'tree', message: 'Árvore exuberante!', active: false });
+      scenery.push({ img: casaImg, x: 1500 * scale, y: platforms[0].y - 100 * scale + 20 * scale, w: 150 * scale * 0.9, h: 100 * scale * 0.9, type: 'house', message: 'Casa Moderna 2 - Outro projeto residencial com HTML, CSS e JS.', url: 'https://github.com/yourusername/house-project-2', active: false });
+      scenery.push({ img: arvoreImg, x: 1600 * scale, y: platforms[0].y - 110 * scale + 10 * scale, w: 80 * scale * 0.9, h: 120 * scale * 0.9, type: 'tree', message: 'Árvore exuberante!', active: false });
+      scenery.push({ img: barbeariaImg, x: 1800 * scale, y: platforms[0].y - 100 * scale + 10 * scale, w: 180 * scale * 0.9, h: 110 * scale * 0.9, type: 'barber', message: 'Micro SaaS para gestão de barbearias, feito com HTML, CSS e JavaScript.', url: 'https://jvbsv2.vercel.app', active: false });
+      scenery.push({ img: empresaImg, x: 2100 * scale, y: platforms[0].y - 110 * scale + 10 * scale, w: 200 * scale * 0.9, h: 120 * scale * 0.9, type: 'company', message: 'Empresa Tech 2 - Outro sistema de gestão em React e Node.js.', url: 'https://github.com/yourusername/company-project-2', active: false });
+      scenery.push({ img: arvoreImg, x: 1900 * scale, y: platforms[0].y - 110 * scale + 10 * scale, w: 80 * scale * 0.9, h: 120 * scale * 0.9, type: 'tree', message: 'Mais uma árvore vibrante!', active: false });
+      scenery.push({ img: arvoreImg, x: 2200 * scale, y: platforms[0].y - 110 * scale + 10 * scale, w: 80 * scale * 0.9, h: 120 * scale * 0.9, type: 'tree', message: 'Árvore exuberante!', active: false });
+      scenery.push({ img: rocketImg, x: 2300 * scale, y: platforms[0].y - 120 * scale + 10 * scale, w: 80 * scale * 0.9, h: 120 * scale * 0.9, type: 'rocket', baseY: platforms[0].y - 120 * scale + 10 * scale, active: false });
+
+      scenery.forEach(s => {
+        if (['house', 'company', 'office', 'barber'].includes(s.type)) {
+          coins.push({
+            x: s.x + s.w / 2 - 15 * scale,
+            y: s.y - 30 * scale,
+            w: 30 * scale,
+            h: 30 * scale,
+            collected: false
+          });
+        }
+      });
+
+      npcs.push({
+        img: xandinhoImg,
+        x: 50 * scale,
+        y: platforms[0].y - 48 * scale + 10 * scale,
+        w: 32 * scale,
+        h: 48 * scale,
+        speed: 1 * scale,
+        messages: [
+          { text: 'Ei, bora brincar de pega-pega?', condition: () => true },
+          { text: 'Cuidado, sou mais rápido que você!', condition: () => true },
+          { text: 'Tá com todas as moedas? Impressionante!', condition: () => player.score >= coins.length },
+          { text: 'Corre, que eu te pego!', condition: () => chaseActive }
+        ],
+        dialogIndex: 0,
+        firstInteraction: true,
+        animScale: 1,
+        animTarget: 1
+      });
+      npcs.push({
+        img: lulinhaImg,
+        x: 800 * scale,
+        y: platforms[0].y - 48 * scale + 10 * scale,
+        w: 32 * scale,
+        h: 48 * scale,
+        speed: 1 * scale,
+        messages: [
+          { text: 'E aí, quer um churrasco?', condition: () => true },
+          { text: 'Já experimentou um pão com mortadela?', condition: () => true },
+          { text: 'Tô de boa, e tu?', condition: () => true },
+          { text: 'Pegou todas as moedas? Bora comemorar!', condition: () => player.score >= coins.length }
+        ],
+        dialogIndex: 0,
+        animScale: 1,
+        animTarget: 1
+      });
+      npcs.push({
+        img: jairbolzonaroImg,
+        x: 1900 * scale,
+        y: platforms[0].y - 48 * scale + 10 * scale,
+        w: 32 * scale,
+        h: 48 * scale,
+        speed: 1 * scale,
+        messages: [
+          { text: 'Mito ou não mito?', condition: () => true },
+          { text: 'Aqui é tudo nos conformes!', condition: () => true },
+          { text: 'Tá na hora de acelerar!', condition: () => true },
+          { text: 'Coletou tudo? É o cara!', condition: () => player.score >= coins.length }
+        ],
+        dialogIndex: 0,
+        animScale: 1,
+        animTarget: 1
+      });
+
+      for (let i = 0; i < 8; i++) {
+        clouds.push({ x: random(0, windowWidth * 3), y: random(50, windowHeight / 3), w: random(100, 200) * scale, h: random(50, 100) * scale, speed: random(0.5, 1.5) * scale });
+      }
+
+      cars.push({
+        x: windowWidth + 600 * scale,
+        y: platforms[0].y + platforms[0].h - 112 * scale,
+        w: 100 * scale,
+        h: 50 * scale,
+        speed: -2 * scale
+      });
+
+      let buttonSize = min(80 * scale, windowWidth * 0.2);
+      let buttonMargin = 20 * scale;
+      leftButton = { x: buttonMargin, y: platforms[0].y - buttonSize - buttonMargin, w: buttonSize, h: buttonSize, active: false };
+      rightButton = { x: buttonMargin + buttonSize + 10 * scale, y: platforms[0].y - buttonSize - buttonMargin, w: buttonSize, h: buttonSize, active: false };
+      jumpButton = { x: windowWidth - buttonSize - buttonMargin, y: platforms[0].y - buttonSize - buttonMargin, w: buttonSize, h: buttonSize, active: false };
+      interactButton = { x: windowWidth - buttonSize - buttonMargin, y: platforms[0].y - 2 * buttonSize - 2 * buttonMargin, w: buttonSize, h: buttonSize, active: false };
+    }
+
+    function draw() {
+      background(135, 206, 235);
+
+      let camX = constrain(player.x - windowWidth / 2, 0, platforms[0].w - windowWidth);
+      translate(-camX, 0);
+
+      for (let cloud of clouds) {
+        if (nuvemImg) {
+          image(nuvemImg, cloud.x, cloud.y, cloud.w, cloud.h);
+        } else {
+          fill(255, 255, 255, 200);
+          noStroke();
+          ellipse(cloud.x, cloud.y, cloud.w, cloud.h);
+        }
+        cloud.x += cloud.speed;
+        if (cloud.x > platforms[0].w + cloud.w / 2) cloud.x = -cloud.w / 2;
+      }
+
+      for (let p of platforms) {
+        fill(74, 74, 74);
+        noStroke();
+        rect(p.x, p.y + p.h, p.w, p.road.h);
+        if (groundTexture) {
+          let scale = windowWidth / 800;
+          for (let x = p.x; x < p.x + p.w; x += groundTexture.width * scale) {
+            image(groundTexture, x, p.y, groundTexture.width * scale, p.h);
+          }
+        } else {
+          fill(139, 69, 19);
+          rect(p.x, p.y, p.w, p.h);
+        }
+      }
+
+      updatePlayer();
+      drawScenery();
+      updateCoins();
+      checkRocketCollision();
+      updateNPCsAndCars();
+
+      if (playerImg) image(playerImg, player.x, player.y, player.w, player.h);
+
+      if (dialog) {
+        let scale = windowWidth / 800;
+        let maxWidth = 300 * scale;
+        let padding = 15 * scale;
+        textFont('Press Start 2P', 12 * scale);
+        textWrap(WORD);
+        let textHeight = textAscent() + textDescent();
+        let lines = dialog.message.split('\n').length;
+        let bubbleWidth = maxWidth;
+        let bubbleHeight = textHeight * lines + padding * 2;
+        let bubbleX = camX + windowWidth / 2 - bubbleWidth / 2;
+        let bubbleY = windowHeight / 4;
+
+        let elapsed = millis() - dialog.startTime;
+        dialog.alpha = lerp(dialog.alpha, 255, min(elapsed / 500, 1));
+
+        fill(0, 0, 0, dialog.alpha * 0.2);
+        rect(bubbleX + 5 * scale, bubbleY + 5 * scale, bubbleWidth, bubbleHeight, 10 * scale);
+
+        for (let y = bubbleY; y < bubbleY + bubbleHeight; y++) {
+          let c = lerpColor(color(135, 206, 235), color(255, 255, 255), (y - bubbleY) / bubbleHeight);
+          stroke(c, dialog.alpha);
+          line(bubbleX, y, bubbleX + bubbleWidth, y);
+        }
+
+        noFill();
+        stroke(0, dialog.alpha);
+        strokeWeight(4 * scale);
+        rect(bubbleX, bubbleY, bubbleWidth, bubbleHeight, 10 * scale);
+
+        if (dialog.npc) {
+          let npcCenterX = dialog.npc.x + dialog.npc.w / 2;
+          let arrowX = constrain(npcCenterX, bubbleX + 20 * scale, bubbleX + bubbleWidth - 20 * scale);
+          fill(255, 255, 255, dialog.alpha);
+          noStroke();
+          triangle(
+            arrowX - 10 * scale, bubbleY + bubbleHeight,
+            arrowX + 10 * scale, bubbleY + bubbleHeight,
+            arrowX, bubbleY + bubbleHeight + 10 * scale
+          );
+        }
+
+        fill(0, dialog.alpha);
+        noStroke();
+        textAlign(CENTER, CENTER);
+        textStyle(BOLD);
+        text(dialog.message, bubbleX + padding, bubbleY + padding, bubbleWidth - 2 * padding, bubbleHeight - 2 * padding);
+
+        if (elapsed > 5000 && !gameOver) dialog = null;
+      }
+
+      translate(camX, 0);
+      fill(0);
+      textFont('Arial', 20 * (windowWidth / 800));
+      textAlign(LEFT, TOP);
+      text(`Moedas: ${player.score}`, 10, 10);
+
+      if (isMobile()) {
+        for (let btn of [leftButton, rightButton, jumpButton, interactButton]) {
+          fill(btn.active ? [100, 100, 100, 200] : [150, 150, 150, 200]);
+          rect(btn.x, btn.y, btn.w, btn.h, 10 * (windowWidth / 800));
+        }
+        fill(0);
+        textSize(min(24 * (windowWidth / 800), windowWidth / 25));
+        textAlign(CENTER, CENTER);
+        text("←", leftButton.x + leftButton.w / 2, leftButton.y + leftButton.h / 2);
+        text("→", rightButton.x + rightButton.w / 2, rightButton.y + leftButton.h / 2);
+        text("↑", jumpButton.x + jumpButton.w / 2, jumpButton.y + jumpButton.h / 2);
+        text("A", interactButton.x + interactButton.w / 2, interactButton.y + interactButton.h / 2);
+      }
+    }
+
+    function drawScenery() {
+      let scale = windowWidth / 800;
+      for (let s of scenery) {
+        if (s.type === 'welcome') {
+          if (s.img) {
+            let drawY = s.baseY + sin(millis() / 1000) * 8 * scale;
+            image(s.img, s.x, drawY, s.w, s.h);
+          } else {
+            fill(255, 255, 255, 220);
+            rect(s.x, s.y, s.w, s.h, 15 * scale);
+          }
+        } else if (s.img) {
+          let drawY = s.y;
+          if (s.type === 'rocket') {
+            if (rocketFlying) {
+              drawY = s.baseY - (millis() - rocketFlyStart) * 0.5 * scale;
+            } else {
+              drawY = s.baseY + sin(millis() / 1000) * 5 * scale;
+            }
+          }
+          image(s.img, s.x, drawY, s.w, s.h);
+          if (s.active) {
+            stroke(255, 255, 0);
+            strokeWeight(2 * scale);
+            noFill();
+            rect(s.x, s.y, s.w, s.h);
+            noStroke();
+          }
+        }
+      }
+    }
+
+    function updatePlayer() {
+      player.vy += GRAVITY;
+      player.x += player.vx;
+      player.y += player.vy;
+
+      player.grounded = false;
+      for (let p of platforms) {
+        if (player.x + player.w > p.x && player.x < p.x + p.w &&
+            player.y + player.h > p.y && player.y + player.h < p.y + 20 &&
+            player.vy >= 0) {
+          player.y = p.y - player.h;
+          player.vy = 0;
+          player.grounded = true;
+        }
+      }
+
+      for (let s of scenery) {
+        if (['house', 'company', 'office', 'barber'].includes(s.type) &&
+            player.x + player.w > s.x && player.x < s.x + s.w &&
+            player.y + player.h > s.y && player.y + player.h < s.y + 20 &&
+            player.vy >= 0) {
+          player.y = s.y - player.h;
+          player.vy = 0;
+          player.grounded = true;
+        }
+      }
+
+      player.x = constrain(player.x, 0, platforms[0].w - player.w);
+      if (player.y > height) {
+        player.y = platforms[0].y - player.h;
+        player.vy = 0;
+      }
+    }
+
+    function updateCoins() {
+      for (let coin of coins) {
+        if (!coin.collected) {
+          if (coinImg) image(coinImg, coin.x, coin.y, coin.w, coin.h);
+          else {
+            fill(255, 215, 0);
+            ellipse(coin.x + coin.w / 2, coin.y + coin.h / 2, coin.w, coin.h);
+          }
+          if (player.x + player.w > coin.x && player.x < coin.x + coin.w &&
+              player.y + player.h > coin.y && player.y < coin.y + coin.h) {
+            coin.collected = true;
+            player.score += 1;
+          }
+        }
+      }
+    }
+
+    function checkRocketCollision() {
+      let rocket = scenery.find(s => s.type === 'rocket');
+      if (rocket && !gameOver && !rocketFlying &&
+          player.x + player.w > rocket.x && player.x < rocket.x + rocket.w &&
+          player.y + player.h > rocket.baseY && player.y < rocket.baseY + rocket.h) {
+        gameOver = true;
+        rocketFlying = true;
+        rocketFlyStart = millis();
+        dialog = { message: 'Parabéns! Veja meu portfólio completo!', startTime: millis(), alpha: 0 };
+        setTimeout(() => window.location.href = 'https://yourportfolio.com', 2000);
+      }
+    }
+
+    function updateNPCsAndCars() {
+      if (!gameStarted || gameOver) {
+        for (let npc of npcs) {
+          if (npc.img) {
+            image(npc.img, npc.x, npc.y, npc.w * npc.animScale, npc.h * npc.animScale);
+          }
+        }
+        for (let car of cars) {
+          if (carImg) image(carImg, car.x, car.y, car.w, car.h);
+          else {
+            fill(200, 0, 0);
+            rect(car.x, car.y, car.w, car.h);
+          }
+        }
+        return;
+      }
+
+      let scale = windowWidth / 800;
+      for (let i = 0; i < npcs.length; i++) {
+        let npc = npcs[i];
+        if (chaseActive) {
+          if (player.x > npc.x) npc.x += npc.speed;
+          else if (player.x < npc.x) npc.x -= npc.speed;
+        }
+
+        npc.animScale = lerp(npc.animScale, npc.animTarget, 0.1);
+        if (npc.img) {
+          image(npc.img, npc.x, npc.y, npc.w * npc.animScale, npc.h * npc.animScale);
+        }
+
+        let inRange = player.x + player.w > npc.x - 120 * scale && player.x < npc.x + npc.w + 120 * scale &&
+                      player.y + player.h > platforms[0].y - npc.h && player.y < platforms[0].y;
+        if (inRange) {
+          fill(255, 255, 0);
+          textFont('Arial', 20 * scale);
+          textAlign(CENTER, BOTTOM);
+          text('!', npc.x + npc.w / 2, npc.y - 10 * scale);
+        }
+
+        if (chaseActive && player.x + player.w > npc.x && player.x < npc.x + npc.w &&
+            player.y + player.h > platforms[0].y - npc.h && player.y < platforms[0].y) {
+          gameOver = true;
+          dialog = { message: 'Você foi taxado! Volte ao início', startTime: millis(), alpha: 0 };
+        }
+      }
+
+      for (let car of cars) {
+        if (chaseActive) {
+          car.x += car.speed;
+          if (car.x < -car.w) car.x = platforms[0].w + random(600, 1000) * scale;
+        }
+        if (carImg) image(carImg, car.x, car.y, car.w, car.h);
+        else {
+          fill(200, 0, 0);
+          rect(car.x, car.y, car.w, car.h);
+        }
+        if (chaseActive &&
+            player.x + player.w > car.x && player.x < car.x + car.w &&
+            player.y + player.h > car.y && player.y < car.y + car.h) {
+          gameOver = true;
+          dialog = { message: 'Game Over! Você foi atingido por um carro!', startTime: millis(), alpha: 0 };
+        }
+      }
+    }
+
+    function handleInteraction() {
+      if (gameOver || millis() - lastInteractTime < interactCooldown || dialog) return;
+      let scale = windowWidth / 800;
+      lastInteractTime = millis();
+
+      for (let i = 0; i < npcs.length; i++) {
+        let npc = npcs[i];
+        let inRange = player.x + player.w > npc.x - 120 * scale && player.x < npc.x + npc.w + 120 * scale &&
+                      player.y + player.h > platforms[0].y - npc.h && player.y < platforms[0].y;
+        if (inRange) {
+          let validMessages = npc.messages.filter(m => m.condition());
+          if (validMessages.length > 0) {
+            npc.dialogIndex = (npc.dialogIndex + 1) % validMessages.length;
+            dialog = {
+              message: validMessages[npc.dialogIndex].text,
+              startTime: millis(),
+              alpha: 0,
+              npc: npc
+            };
+            npc.animTarget = 1.05;
+            setTimeout(() => npc.animTarget = 1, 200);
+            if (i === 0 && npc.firstInteraction) {
+              setTimeout(() => chaseActive = true, 2000);
+              npc.firstInteraction = false;
+            }
+            return;
+          }
+        }
+      }
+
+      for (let s of scenery) {
+        if (['house', 'company', 'office', 'barber'].includes(s.type) &&
+            player.x + player.w > s.x && player.x < s.x + s.w &&
+            player.y + player.h > s.y && player.y + player.h < s.y + 20) {
+          let currentTime = millis();
+          if (lastSceneryInteracted === s && currentTime - lastInteractTimeScenery < sceneryInteractInterval) {
+            if (s.url) {
+              setTimeout(() => window.open(s.url, '_blank'), 500);
+            }
+            lastSceneryInteracted = null;
+            lastInteractTimeScenery = 0;
+          } else {
+            dialog = { message: s.message, startTime: millis(), alpha: 0 };
+            s.active = true;
+            setTimeout(() => s.active = false, 500);
+            lastSceneryInteracted = s;
+            lastInteractTimeScenery = currentTime;
+          }
+          break;
+        }
+      }
+    }
+
+    function isMobile() {
+      return /Mobi|Android|iPhone|iPad|iPod/.test(navigator.userAgent);
+    }
+
+    function mousePressed() {
+      if (gameOver && dialog.message !== 'Parabéns! Veja meu portfólio completo!') {
+        resetGame();
+        return;
+      }
+      let currentTime = millis();
+      let camX = constrain(player.x - windowWidth / 2, 0, platforms[0].w - windowWidth);
+      let adjustedMouseX = mouseX + camX;
+
+      if (dialog && dialog.message !== 'Parabéns! Veja meu portfólio completo!') {
+        let scale = windowWidth / 800;
+        let maxWidth = 300 * scale;
+        let padding = 15 * scale;
+        let textHeight = textAscent() + textDescent();
+        let lines = dialog.message.split('\n').length;
+        let bubbleWidth = maxWidth;
+        let bubbleHeight = textHeight * lines + padding * 2;
+        let bubbleX = camX + windowWidth / 2 - bubbleWidth / 2;
+        let bubbleY = windowHeight / 4;
+        if (mouseX < bubbleX || mouseX > bubbleX + bubbleWidth || mouseY < bubbleY || mouseY > bubbleY + bubbleHeight) {
+          dialog = null;
+          return;
+        }
+      }
+
+      for (let s of scenery) {
+        if (['house', 'company', 'office', 'barber'].includes(s.type) &&
+            adjustedMouseX > s.x && adjustedMouseX < s.x + s.w &&
+            mouseY > s.y && mouseY < s.y + s.h && !dialog) {
+          let currentTime = millis();
+          if (lastSceneryInteracted === s && currentTime - lastInteractTimeScenery < sceneryInteractInterval) {
+            if (s.url) {
+              setTimeout(() => window.open(s.url, '_blank'), 500);
+            }
+            lastSceneryInteracted = null;
+            lastInteractTimeScenery = 0;
+          } else {
+            dialog = { message: s.message, startTime: millis(), alpha: 0 };
+            s.active = true;
+            setTimeout(() => s.active = false, 500);
+            lastSceneryInteracted = s;
+            lastInteractTimeScenery = currentTime;
+          }
+          break;
+        }
+      }
+    }
+
+    function touchStarted() {
+      if (gameOver && dialog.message !== 'Parabéns! Veja meu portfólio completo!') {
+        resetGame();
+        return;
+      }
+      for (let touch of touches) {
+        let touchX = touch.x;
+        let adjustedTouchX = touchX + (player.x - windowWidth / 2);
+        if (dialog && dialog.message !== 'Parabéns! Veja meu portfólio completo!') {
+          let scale = windowWidth / 800;
+          let maxWidth = 300 * scale;
+          let padding = 15 * scale;
+          let textHeight = textAscent() + textDescent();
+          let lines = dialog.message.split('\n').length;
+          let bubbleWidth = maxWidth;
+          let bubbleHeight = textHeight * lines + padding * 2;
+          let bubbleX = (player.x - windowWidth / 2) + windowWidth / 2 - bubbleWidth / 2;
+          let bubbleY = windowHeight / 4;
+          if (touchX < bubbleX || touchX > bubbleX + bubbleWidth || touch.y < bubbleY || touch.y > bubbleY + bubbleHeight) {
+            dialog = null;
+            continue;
+          }
+        }
+        if (adjustedTouchX > leftButton.x && adjustedTouchX < leftButton.x + leftButton.w &&
+            touch.y > leftButton.y && touch.y < leftButton.y + leftButton.h) {
+          player.vx = -player.speed;
+          leftButton.active = true;
+        }
+        if (adjustedTouchX > rightButton.x && adjustedTouchX < rightButton.x + rightButton.w &&
+            touch.y > rightButton.y && touch.y < rightButton.y + rightButton.h) {
+          player.vx = player.speed;
+          rightButton.active = true;
+        }
+        if (adjustedTouchX > jumpButton.x && adjustedTouchX < jumpButton.x + jumpButton.w &&
+            touch.y > jumpButton.y && touch.y < jumpButton.y + jumpButton.h &&
+            player.grounded) {
+          player.vy = JUMP_FORCE;
+          jumpButton.active = true;
+        }
+        if (adjustedTouchX > interactButton.x && adjustedTouchX < interactButton.x + interactButton.w &&
+            touch.y > interactButton.y && touch.y < interactButton.y + interactButton.h) {
+          interactButton.active = true;
+          handleInteraction();
+        }
+      }
+    }
+
+    function touchEnded() {
+      player.vx = 0;
+      leftButton.active = false;
+      rightButton.active = false;
+      jumpButton.active = false;
+      interactButton.active = false;
+    }
+
+    function keyPressed() {
+      if (gameOver && dialog.message !== 'Parabéns! Veja meu portfólio completo!') {
+        resetGame();
+        return;
+      }
+      if (keyCode === ESCAPE && dialog && dialog.message !== 'Parabéns! Veja meu portfólio completo!') {
+        dialog = null;
+        return;
+      }
+      if (keyCode === LEFT_ARROW) player.vx = -player.speed;
+      else if (keyCode === RIGHT_ARROW) player.vx = player.speed;
+      else if (keyCode === UP_ARROW && player.grounded) player.vy = JUMP_FORCE;
+      else if (keyCode === 32 || key === 'a' || key === 'A') {
+        handleInteraction();
+      }
+    }
+
+    function keyReleased() {
+      if (keyCode === LEFT_ARROW || keyCode === RIGHT_ARROW) player.vx = 0;
+      else if (keyCode === 32 || key === 'a' || key === 'A') {
+        interactButton.active = false;
+      }
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      let scale = windowWidth / 800;
+      platforms[0].w = windowWidth * 3;
+      platforms[0].y = windowHeight - 100 * scale;
+      platforms[0].h = 100 * scale;
+      platforms[0].road.h = 20 * scale;
+      player.x = 100 * scale;
+      player.y = platforms[0].y - 48 * scale;
+      player.w = 32 * scale;
+      player.h = 48 * scale;
+      player.speed = PLAYER_SPEED * scale;
+      scenery[0].x = windowWidth / 2 - 150 * scale * 1.089;
+      scenery[0].y = 30 * scale;
+      scenery[0].baseY = 30 * scale;
+      scenery[0].w = 300 * scale * 1.089;
+      scenery[0].h = 90 * scale * 1.089;
+      scenery[1].x = 300 * scale;
+      scenery[1].y = platforms[0].y - 100 * scale + 20 * scale;
+      scenery[1].w = 150 * scale * 0.9;
+      scenery[1].h = 100 * scale * 0.9;
+      scenery[2].x = 600 * scale;
+      scenery[2].y = platforms[0].y - 110 * scale + 10 * scale;
+      scenery[2].w = 200 * scale * 0.9;
+      scenery[2].h = 120 * scale * 0.9;
+      scenery[3].x = 1000 * scale;
+      scenery[3].y = platforms[0].y - 95 * scale + 10 * scale;
+      scenery[3].w = 180 * scale * 0.9;
+      scenery[3].h = 110 * scale * 0.9;
+      scenery[4].x = 1300 * scale;
+      scenery[4].y = platforms[0].y - 110 * scale + 10 * scale;
+      scenery[4].w = 80 * scale * 0.9;
+      scenery[4].h = 120 * scale * 0.9;
+      scenery[5].x = 450 * scale;
+      scenery[5].y = platforms[0].y - 110 * scale + 10 * scale;
+      scenery[5].w = 80 * scale * 0.9;
+      scenery[5].h = 120 * scale * 0.9;
+      scenery[6].x = 700 * scale;
+      scenery[6].y = platforms[0].y - 110 * scale + 10 * scale;
+      scenery[6].w = 80 * scale * 0.9;
+      scenery[6].h = 120 * scale * 0.9;
+      scenery[7].x = 1500 * scale;
+      scenery[7].y = platforms[0].y - 100 * scale + 20 * scale;
+      scenery[7].w = 150 * scale * 0.9;
+      scenery[7].h = 100 * scale * 0.9;
+      scenery[8].x = 1600 * scale;
+      scenery[8].y = platforms[0].y - 110 * scale + 10 * scale;
+      scenery[8].w = 80 * scale * 0.9;
+      scenery[8].h = 120 * scale * 0.9;
+      scenery[9].x = 1800 * scale;
+      scenery[9].y = platforms[0].y - 100 * scale + 10 * scale;
+      scenery[9].w = 180 * scale * 0.9;
+      scenery[9].h = 110 * scale * 0.9;
+      scenery[10].x = 2100 * scale;
+      scenery[10].y = platforms[0].y - 110 * scale + 10 * scale;
+      scenery[10].w = 200 * scale * 0.9;
+      scenery[10].h = 120 * scale * 0.9;
+      scenery[11].x = 1900 * scale;
+      scenery[11].y = platforms[0].y - 110 * scale + 10 * scale;
+      scenery[11].w = 80 * scale * 0.9;
+      scenery[11].h = 120 * scale * 0.9;
+      scenery[12].x = 2200 * scale;
+      scenery[12].y = platforms[0].y - 110 * scale + 10 * scale;
+      scenery[12].w = 80 * scale * 0.9;
+      scenery[12].h = 120 * scale * 0.9;
+      scenery[13].x = 2300 * scale;
+      scenery[13].y = platforms[0].y - 120 * scale + 10 * scale;
+      scenery[13].baseY = platforms[0].y - 120 * scale + 10 * scale;
+      scenery[13].w = 80 * scale * 0.9;
+      scenery[13].h = 120 * scale * 0.9;
+      npcs[0].x = 50 * scale;
+      npcs[0].y = platforms[0].y - 48 * scale + 10 * scale;
+      npcs[0].w = 32 * scale;
+      npcs[0].h = 48 * scale;
+      npcs[0].speed = 1 * scale;
+      npcs[1].x = 800 * scale;
+      npcs[1].y = platforms[0].y - 48 * scale + 10 * scale;
+      npcs[1].w = 32 * scale;
+      npcs[1].h = 48 * scale;
+      npcs[1].speed = 1 * scale;
+      npcs[2].x = 1900 * scale;
+      npcs[2].y = platforms[0].y - 48 * scale + 10 * scale;
+      npcs[2].w = 32 * scale;
+      npcs[2].h = 48 * scale;
+      npcs[2].speed = 1 * scale;
+      cars[0].x = windowWidth + 600 * scale;
+      cars[0].y = platforms[0].y + platforms[0].h - 112 * scale;
+      cars[0].w = 100 * scale;
+      cars[0].h = 50 * scale;
+      cars[0].speed = -2 * scale;
+      coins.forEach(coin => {
+        coin.x = coin.x / (windowWidth / 800) * scale;
+        coin.y = coin.y / (windowWidth / 800) * scale;
+        coin.w = 30 * scale;
+        coin.h = 30 * scale;
+      });
+      for (let cloud of clouds) {
+        cloud.w = random(100, 200) * scale;
+        cloud.h = random(50, 100) * scale;
+        cloud.speed = random(0.5, 1.5) * scale;
+      }
+      let buttonSize = min(80 * scale, windowWidth * 0.2);
+      let buttonMargin = 20 * scale;
+      leftButton.x = buttonMargin;
+      leftButton.y = platforms[0].y - buttonSize - buttonMargin;
+      leftButton.w = buttonSize;
+      leftButton.h = buttonSize;
+      rightButton.x = buttonMargin + buttonSize + 10 * scale;
+      rightButton.y = platforms[0].y - buttonSize - buttonMargin;
+      rightButton.w = buttonSize;
+      rightButton.h = buttonSize;
+      jumpButton.x = windowWidth - buttonSize - buttonMargin;
+      jumpButton.y = platforms[0].y - buttonSize - buttonMargin;
+      jumpButton.w = buttonSize;
+      jumpButton.h = buttonSize;
+      interactButton.x = windowWidth - buttonSize - buttonMargin;
+      interactButton.y = platforms[0].y - 2 * buttonSize - 2 * buttonMargin;
+      interactButton.w = buttonSize;
+      interactButton.h = buttonSize;
+    }
+
+    function resetGame() {
+      let scale = windowWidth / 800;
+      gameOver = false;
+      chaseActive = false;
+      rocketFlying = false;
+      rocketFlyStart = 0;
+      dialog = null;
+      player.x = 100 * scale;
+      player.y = platforms[0].y - 48 * scale;
+      player.vx = 0;
+      player.vy = 0;
+      player.score = 0;
+      npcs[0].x = 50 * scale;
+      npcs[0].y = platforms[0].y - 48 * scale + 10 * scale;
+      npcs[0].dialogIndex = 0;
+      npcs[0].firstInteraction = true;
+      npcs[0].animScale = 1;
+      npcs[0].animTarget = 1;
+      npcs[1].x = 800 * scale;
+      npcs[1].y = platforms[0].y - 48 * scale + 10 * scale;
+      npcs[1].dialogIndex = 0;
+      npcs[1].animScale = 1;
+      npcs[1].animTarget = 1;
+      npcs[2].x = 1900 * scale;
+      npcs[2].y = platforms[0].y - 48 * scale + 10 * scale;
+      npcs[2].dialogIndex = 0;
+      npcs[2].animScale = 1;
+      npcs[2].animTarget = 1;
+      cars[0].x = windowWidth + 600 * scale;
+      cars[0].y = platforms[0].y + platforms[0].h - 112 * scale;
+      cars[0].w = 100 * scale;
+      cars[0].h = 50 * scale;
+      coins.forEach(coin => coin.collected = false);
+      lastSceneryInteracted = null;
+      lastInteractTimeScenery = 0;
+    }
+  </script>
+</body>
+</html>
